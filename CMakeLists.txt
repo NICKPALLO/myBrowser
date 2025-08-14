@@ -1,6 +1,7 @@
 ﻿cmake_minimum_required (VERSION 3.8)
 
 
+
 project ("MyBrowser")
 
 set(BOOST_ROOT "C:/boost") #Путь к папке Boost c папками include lib и share
@@ -10,13 +11,17 @@ find_package(OpenSSL REQUIRED)
 
 find_package(Boost REQUIRED)
 
-include_directories(${Boost_INCLUDE_DIRS})
+#include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(MyBrowser MyBrowser.cpp crowler.cpp)
 
+target_include_directories(MyBrowser PRIVATE ${Boost_INCLUDE_DIRS})
+
 target_link_libraries(MyBrowser PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
-#target_link_libraries(MyBrowser PRIVATE Boost::asio)
+#target_link_libraries(czech2017 ${Boost_LIBRARIES})
+
+#target_link_libraries(MyBrowser PRIVATE Boost)
 #target_include_directories(MyBrowser PRIVATE ${Boost_INCLUDE_DIRS})
 
 #target_include_directories(MyBrowser PRIVATE ${Boost_INCLUDE_DIRS})

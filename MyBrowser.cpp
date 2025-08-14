@@ -2,7 +2,7 @@
 #include "MyBrowser.h"
 #include "crowler.h"
 #include <algorithm>
-
+#include <regex>
 
 #include <string>
 #include <boost/asio.hpp>
@@ -209,20 +209,13 @@ int httpsRequest()
 
 int main()
 {
-    //httpsRequest();
-    string host = "ya.ru";
-    string port = "80";
-    string target = "/";
+    //const string host = "ya.ru";
+    //const string host = "www.wikipedia.org";
+    const string port = HTTPS_PORT;
+    const string target = "/";
     Crowler crowler;
+
     crowler.downloading(host, port, target);
-
-    //std::string str("https://ya.ru/ethetheth");
-
-    //URLParser urlParser(str);
-
-    //std::cout << urlParser.host<<std::endl;
-    //std::cout << urlParser.port<<std::endl;
-    //std::cout << urlParser.target;
 
 
 	return 0;

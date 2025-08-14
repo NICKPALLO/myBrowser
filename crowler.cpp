@@ -70,14 +70,14 @@ void Crowler::downloading(const std::string& host, const std::string& port, cons
 
 	if (result.result_int() == 200)
 	{
-		//продолжаем работу с ответом
 		std::cout << "--------------------------\n";
 		std::cout << "Complete!\n\n";
 
 		linkSearching(beast::buffers_to_string(result.body().data()));
-		//std::cout << result;
+		std::cout<< "--------------------------\n";
+		indexing(beast::buffers_to_string(result.body().data()));
 	}
-	else if(result.result_int() == 301 || result.result_int() == 302)
+	else if(result.result_int() > 300 || result.result_int() < 309)
 	{
 		std::cout << "--------------------------\n";
 		std::cout << "Redirection!\n";
@@ -86,9 +86,30 @@ void Crowler::downloading(const std::string& host, const std::string& port, cons
 	}
 }
 
-void Crowler::indexing()
+void Crowler::indexing(std::string& data)
 {
+	request.push_back("search");
+	request.push_back("information");
 
+
+	std::regex regular("(<[^>]*>|[[:punct:]]|[\tЧ\v\r\n\f])");
+	std::string clearText = regex_replace(data, regular, "");
+	boost::algorithm::to_lower(clearText);
+	int relevance = 0;
+	for (int i = 0; i < request.size(); ++i)
+	{
+		int cursor = 0;
+		while (cursor != NOTFOUND)
+		{
+			cursor = clearText.find(request[i], cursor);
+			if (cursor != NOTFOUND)
+			{
+				relevance++;
+				cursor += request[i].size();
+			}
+		}
+	}
+	std::cout << "\nrelevance = " << relevance << std::endl;
 }
 
 bool Crowler::isItLink(const std::string& ref)

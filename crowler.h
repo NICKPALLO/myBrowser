@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <regex>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -11,6 +12,10 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/core/stream_traits.hpp>
+
+//#include <boost/locale.hpp>
+#include <boost/algorithm/string.hpp>
+
 
 #ifndef NOTFOUND
 #define NOTFOUND std::string::npos
@@ -45,7 +50,7 @@ class Crowler
 public:
 	void linkSearching(const std::string& request);
 	void downloading(const std::string& host, const std::string& port, const std::string& target);
-	void indexing();
+	void indexing(std::string& data);
 
 private:
 	bool isItLink(const std::string& ref);
@@ -55,6 +60,7 @@ private:
 
 
 	http::response<http::dynamic_body> result;
+	std::vector<std::string> request;
 };
 
 
