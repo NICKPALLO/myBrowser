@@ -85,12 +85,6 @@ using namespace std;
 //    }
 //}
 
-
-#ifndef VERIFY_ENABLED
-#define VERIFY_ENABLED false
-#endif
-
-
 int httpRequest()
 {
     try
@@ -113,28 +107,22 @@ int httpRequest()
 
         http::request<http::string_body> req{ http::verb::get, target, version };
         req.set(http::field::host, host);
-        //req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
         req.set(http::field::connection, "close");
 
         http::write(stream, req);
 
-
-
-
-        // This buffer is used for reading and must be persisted
         beast::flat_buffer buffer;
 
-        // Declare a container to hold the response
         http::response<http::dynamic_body> res;
 
-        // Receive the HTTP response
         http::read(stream, buffer, res);
 
         // Write the message to standard out
-        std::cout << res << std::endl;
+        //std::cout << res << std::endl;
 
-        std::cout << std::endl << "-----------------------------------------------------\n";
-        std::cout << res[http::field::location];
+        //std::cout << std::endl << "-----------------------------------------------------\n";
+        //std::cout << res[http::field::location];
 
         // Gracefully close the socket
         beast::error_code ec;
@@ -184,6 +172,7 @@ int httpsRequest()
         http::request<http::string_body> req{ http::verb::get, target, 11 };
         req.set(http::field::host, host);
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.set(http::field::connection, "close");
 
         //шифрование
         stream.handshake(ssl::stream_base::client);
@@ -220,8 +209,21 @@ int httpsRequest()
 
 int main()
 {
-    httpsRequest();
-    //Crowler crowler;
-    //crowler.linkSearching();
+    //httpsRequest();
+    string host = "ya.ru";
+    string port = "80";
+    string target = "/";
+    Crowler crowler;
+    crowler.downloading(host, port, target);
+
+    //std::string str("https://ya.ru/ethetheth");
+
+    //URLParser urlParser(str);
+
+    //std::cout << urlParser.host<<std::endl;
+    //std::cout << urlParser.port<<std::endl;
+    //std::cout << urlParser.target;
+
+
 	return 0;
 }
