@@ -1,8 +1,14 @@
 #pragma once
+
+#include "dataBase.h"
+//#include "threadPool.h"
+#include "URLParser.h"
+
 #include <vector>
 #include <string>
 #include <iostream>
 #include <regex>
+
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -48,9 +54,13 @@ using tcp = net::ip::tcp;
 class Crowler
 {
 public:
+	Crowler(DB* _database);
+	void searching(const URLParser& url, const int recursionStep);
 	void linkSearching(const std::string& request);
-	void downloading(const std::string& host, const std::string& port, const std::string& target);
-	void indexing(std::string& data);
+	std::string downloading(const std::string& host, const std::string& port, const std::string& target);
+	void indexing(std::string& data, const std::string url);
+
+	void startWork(const std::vector<std::string>& request);
 
 private:
 	bool isItLink(const std::string& ref);
@@ -58,17 +68,11 @@ private:
 	http::response<http::dynamic_body> httpRequest(const std::string& host, const std::string& port, const std::string& target);
 	http::response<http::dynamic_body> httpsRequest(const std::string& host, const std::string& port, const std::string& target);
 
-
-	http::response<http::dynamic_body> result;
 	std::vector<std::string> request;
-};
 
+	int recursionLength=2;
+	std::string startlink = "https://www.wikipedia.org/";
+	DB* database;
+	//ThreadPool* threadPool;
 
-class URLParser
-{
-public:
-	URLParser(const std::string& url);
-	std::string host;
-	std::string port;
-	std::string target;
 };

@@ -3,6 +3,9 @@
 #include "crowler.h"
 #include <algorithm>
 #include <regex>
+#include "dataBase.h"
+
+
 
 #include <string>
 #include <boost/asio.hpp>
@@ -211,12 +214,19 @@ int main()
 {
     //const string host = "ya.ru";
     //const string host = "www.wikipedia.org";
-    const string port = HTTPS_PORT;
-    const string target = "/";
-    Crowler crowler;
+    //const string port = HTTPS_PORT;
+    //const string target = "/";
+    //Crowler crowler;
 
-    crowler.downloading(host, port, target);
+    //crowler.downloading(host, port, target);
+    DB database("localhost", "5432", "browserDB", "postgres", "1234");
+    Crowler crowler(&database);
 
+    std::vector<std::string> request;
+    request.push_back("searching");
+    request.push_back("information");
+
+    crowler.startWork(request);
 
 	return 0;
 }
