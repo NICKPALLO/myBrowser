@@ -28,11 +28,24 @@ void DB::createTables()
 	tx.commit();
 }
 
-void DB::addDoc(const std::string& url)
+void DB::addDoc(const std::string& url, const std::vector<std::string>& request)
 {
 	pqxx::work tx{ *c };
 	//tx.exec("SET CLIENT_ENCODING TO 'WIN1251';");
 	tx.exec("insert into Documents(document) values ('" + tx.esc(url) + "')");
+	tx.commit();
+	for (int i = 0; i < request.size(); ++i)
+	{
+		addRelevance(url, request[i], 0);
+	}
+}
+
+void DB::updateRelevance(const std::string& url, const std::string& word, const int relevance)
+{
+	pqxx::work tx{ *c };
+	tx.exec("update relevants set relevance = " + std::to_string(relevance) +
+		" where document_id = (select id from documents where document = '" + tx.esc(url) + "')"
+		" and word_id = (select id from words where word = '"+ tx.esc(word) +"'); ");
 	tx.commit();
 }
 
@@ -51,7 +64,6 @@ void DB::addRelevance(const std::string& url, const std::string& word, const int
 		"(select id from documents where document = '" + tx.esc(url) + "'),"
 		"(select id from words where word = '" + tx.esc(word) + "'),"+ std::to_string(relevance) + ");");
 	tx.commit();
-
 }
 
 int DB::getRelevance(const std::string& url)

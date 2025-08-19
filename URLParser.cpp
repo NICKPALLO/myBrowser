@@ -13,6 +13,8 @@ URLParser::URLParser(const std::string& url)
 	else
 	{
 		port = "NOTFOUND";
+		host = "NOTFOUND";
+		target = "NOTFOUND";
 	}
 	if (port != "NOTFOUND")
 	{

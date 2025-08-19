@@ -1,18 +1,27 @@
 #include "crowler.h"
-#include <iostream>
+//#include <iostream>
 #include <algorithm>
+//осталось - ссылки и обработка исключений!!!
+//навести порядок с url парсерами! понять где они нужны, а где нет
 
-
-Crowler::Crowler(DB* _database) : database(_database) {}
+Crowler::Crowler(DB* _database) : database(_database), ctx(ssl::context::tls_client) 
+{
+	m_ptr = std::make_unique<std::mutex>();
+	threadPool = std::make_unique<ThreadPool>(this);
+	if (VERIFY_ENABLED)
+	{
+		ctx.set_default_verify_paths();
+	}
+}
 
 void Crowler::searching(const URLParser& url, const int recursionStep)
 {
 	try
 	{
 		std::string responce = downloading(url.host, url.port, url.target);
-		if (recursionStep <= recursionLength)
+		if (recursionStep < recursionLength)
 		{
-			linkSearching(responce);
+			linkSearching(responce, recursionStep);
 		}
 		indexing(responce, url.get_string());
 	}
@@ -22,23 +31,23 @@ void Crowler::searching(const URLParser& url, const int recursionStep)
 	}
 }
 
-void Crowler::linkSearching(const std::string& request)
+void Crowler::linkSearching(const std::string& responce, const int recursionStep)
 {
 	std::vector<std::string> links;
 	int beginLink = 0;
 	int endLink = 0;
-	while (beginLink != NOTFOUND || endLink!= NOTFOUND)
+	while (beginLink != NOTFOUND || endLink != NOTFOUND)
 	{
-		int beginLink = request.find("href=", endLink);
+		int beginLink = responce.find("href=", endLink);
 		if (beginLink == NOTFOUND)
 		{
 			break;
 		}
 		beginLink += 6;
-		endLink = request.find('"', beginLink);
+		endLink = responce.find('"', beginLink);
 		if (endLink != NOTFOUND)
 		{
-			std::string ref = request.substr(beginLink, endLink - beginLink);
+			std::string ref = responce.substr(beginLink, endLink - beginLink);
 			if (isItLink(ref))
 			{
 				links.push_back(ref);
@@ -51,19 +60,17 @@ void Crowler::linkSearching(const std::string& request)
 		{
 			links[i][links[i].size() - 1] = '/';
 		}
-		//мьютекс
+		std::unique_lock<std::mutex> ul(*m_ptr);
 		if (!database->FindURL(links[i]))
 		{
-			database->addDoc(links[i]);
-			//добавить в безопсную очередь.
+			database->addDoc(links[i],request);
+			threadPool->push(URLParser(links[i]), recursionStep + 1);
 		}
-		//амьютекс
 	}
 }
 
 std::string Crowler::downloading(const std::string& host, const std::string& port, const std::string& target)
 {
-	//добавить проверку БД изменить httpRequest и httpsRequest;
 	http::response<http::dynamic_body> result;
 
 	if (port == HTTP_PORT)
@@ -86,8 +93,17 @@ std::string Crowler::downloading(const std::string& host, const std::string& por
 	else if(result.result_int() > 300 || result.result_int() < 309)
 	{
 		URLParser url (result[http::field::location]);
-		//проверяем есть ли ссылка в БД
-		return downloading(url.host, url.port, url.target);
+		if (!database->FindURL(url.get_string()))
+		{
+			std::unique_lock<std::mutex> ul(*m_ptr);
+			database->addDoc(url.get_string(), request);
+			ul.unlock();
+			return downloading(url.host, url.port, url.target);
+		}
+		else
+		{
+			throw std::exception("Return to visited url");
+		}
 	}
 	else
 	{
@@ -114,19 +130,24 @@ void Crowler::indexing(std::string& data,const std::string url)
 				cursor += request[i].size();
 			}
 		}
-		//мьютекс
-		database->addRelevance(url, request[i], relevance);
-		//амьют
+		std::unique_lock<std::mutex> ul(*m_ptr);
+		database->updateRelevance(url, request[i], relevance);
 	}
 }
 
 void Crowler::startWork(const std::vector<std::string>& _request)
 {
 	request = _request;
-	//записать в себя запрос
-	//прочитать начальную ссылку.
-	//добавить ее в очередь
-	//запустить пул потоков
+	database->deleteAll();
+	for (int i = 0; i < request.size(); ++i)
+	{
+		database->addWord(request[i]);
+	}
+
+	URLParser starturl(startlink);
+	database->addDoc(starturl.get_string(), request);
+	threadPool->push(starturl, 1);
+	threadPool->startWork();
 }
 
 bool Crowler::isItLink(const std::string& ref)
@@ -140,10 +161,7 @@ bool Crowler::isItLink(const std::string& ref)
 
 http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host, const std::string& port, const std::string& target)
 {
-	//try
-	//{
-		net::io_context ioc; 
-
+		//net::io_context ioc;
 		tcp::resolver resolver(ioc); 
 		beast::tcp_stream stream(ioc); 
 
@@ -164,33 +182,21 @@ http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host,
 
 		http::read(stream, buffer, res);
 
+
 		beast::error_code ec;
 		stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+	
 
 		if (ec && ec != beast::errc::not_connected)
 			throw beast::system_error{ ec };
 		
-		//return beast::buffers_to_string(res.body());
 		return res;
-	//}
-	//catch (std::exception const& e)
-	//{
-	//	std::cerr << "Error: " << e.what() << std::endl;
-	//}
-	//return http::response<http::dynamic_body>();
 }
 
 http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host, const std::string& port, const std::string& target)
 {
-	//try {
-		io_context ioc;
-
-		ssl::context ctx(ssl::context::tls_client);
-		if (VERIFY_ENABLED)
-		{
-			ctx.set_default_verify_paths();
-		}
-
+		//net::io_context ioc;
+		//ssl::context ctx(ssl::context::tls_client);
 		ssl::stream<tcp::socket> stream(ioc, ctx);
 		if (VERIFY_ENABLED)
 		{
@@ -202,8 +208,9 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 		}
 
 		tcp::resolver resolver(ioc);
-		//connect(stream.next_layer(), resolver.resolve(host, port));
+		
 		boost::beast::get_lowest_layer(stream).connect(*(resolver.resolve(host, port).begin()));
+	
 
 		http::request<http::string_body> req{ http::verb::get, target, HTTP_VERSION };
 		req.set(http::field::host, host);
@@ -212,6 +219,7 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 
 		//шифрование
 		stream.handshake(ssl::stream_base::client);
+
 
 		http::write(stream, req);
 
@@ -229,13 +237,8 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 		if (ec) {
 			throw beast::system_error{ ec };
 		}
-		//return beast::buffers_to_string(res.body());
+		//std::cout << beast::buffers_to_string(res.body().data());
 		return res;
-	//}
-	//catch (std::exception& e) {
-	//	std::cerr << "Error: " << e.what() << "\n";
-	//}
-	//return http::response<http::dynamic_body>();
 }
 
 

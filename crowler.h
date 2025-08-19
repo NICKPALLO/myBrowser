@@ -1,12 +1,12 @@
 #pragma once
 
 #include "dataBase.h"
-//#include "threadPool.h"
+#include "threadPool.h"
 #include "URLParser.h"
 
 #include <vector>
 #include <string>
-#include <iostream>
+//#include <iostream>
 #include <regex>
 
 
@@ -56,11 +56,13 @@ class Crowler
 public:
 	Crowler(DB* _database);
 	void searching(const URLParser& url, const int recursionStep);
-	void linkSearching(const std::string& request);
+	void linkSearching(const std::string& responce, const int recursionStep);
 	std::string downloading(const std::string& host, const std::string& port, const std::string& target);
 	void indexing(std::string& data, const std::string url);
 
-	void startWork(const std::vector<std::string>& request);
+	void startWork(const std::vector<std::string>& _request);
+
+	//std::vector<std::string> request;
 
 private:
 	bool isItLink(const std::string& ref);
@@ -70,9 +72,13 @@ private:
 
 	std::vector<std::string> request;
 
-	int recursionLength=2;
+	int recursionLength=3;
 	std::string startlink = "https://www.wikipedia.org/";
+	//std::string startlink = "http://example.com";
 	DB* database;
-	//ThreadPool* threadPool;
+	std::unique_ptr<ThreadPool> threadPool;
+	std::unique_ptr<std::mutex> m_ptr;
 
+	net::io_context ioc; 
+	ssl::context ctx;
 };
