@@ -14,6 +14,7 @@ public:
 	int getRelevance(const std::string& url);
 	void deleteAll();
 	bool FindURL(const std::string& url);
+	void showResults();
 private:
 	void addRelevance(const std::string& url, const std::string& word, const int relevance);
 	std::string host;

@@ -1,16 +1,50 @@
 #include "crowler.h"
-//#include <iostream>
 #include <algorithm>
-//осталось - ссылки и обработка исключений!!!
-//навести пор€док с url парсерами! пон€ть где они нужны, а где нет
 
-Crowler::Crowler(DB* _database) : database(_database), ctx(ssl::context::tls_client) 
+
+Crowler::Crowler() : ctx(ssl::context::tls_client) 
 {
 	m_ptr = std::make_unique<std::mutex>();
 	threadPool = std::make_unique<ThreadPool>(this);
 	if (VERIFY_ENABLED)
 	{
 		ctx.set_default_verify_paths();
+	}
+	try
+	{
+		database = std::make_unique<DB>(DB_host, DB_port, DB_name, DB_user, DB_password);
+	}
+	catch (std::exception ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		log.add(ex.what());
+	}
+}
+
+void Crowler::startWork(const std::vector<std::string>& _request)
+{
+	request = _request;
+	try
+	{
+		database->deleteAll();
+		for (int i = 0; i < request.size(); ++i)
+		{
+			database->addWord(request[i]);
+		}
+		URLParser starturl(startlink);
+		database->addDoc(starturl.get_string(), request);
+		threadPool->push(starturl, 1);
+		threadPool->startWork();
+
+		std::cout << std::endl;
+		std::cout << "---------------------------------------------------";
+		std::cout << std::endl;
+		database->showResults();
+	}
+	catch (std::exception ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		log.add(ex.what());
 	}
 }
 
@@ -27,7 +61,49 @@ void Crowler::searching(const URLParser& url, const int recursionStep)
 	}
 	catch(std::exception ex)
 	{
-		
+		log.add(ex.what());
+	}
+}
+
+std::string Crowler::downloading(const std::string& host, const std::string& port, const std::string& target)
+{
+	http::response<http::dynamic_body> result;
+
+	if (port == HTTP_PORT)
+	{
+		result = httpRequest(host, port, target);
+	}
+	else if (port == HTTPS_PORT)
+	{
+		result = httpsRequest(host, port, target);
+	}
+	else
+	{
+		throw std::exception("Unknown port");
+	}
+
+	if (result.result_int() == 200)
+	{
+		return beast::buffers_to_string(result.body().data());
+	}
+	else if (result.result_int() > 300 || result.result_int() < 309)
+	{
+		URLParser url(result[http::field::location]);
+		if (!database->FindURL(url.get_string()))
+		{
+			std::unique_lock<std::mutex> ul(*m_ptr);
+			database->addDoc(url.get_string(), request);
+			ul.unlock();
+			return downloading(url.host, url.port, url.target);
+		}
+		else
+		{
+			throw std::exception("Return to visited url");
+		}
+	}
+	else
+	{
+		throw std::exception("Unknown HTTP code");
 	}
 }
 
@@ -69,53 +145,12 @@ void Crowler::linkSearching(const std::string& responce, const int recursionStep
 	}
 }
 
-std::string Crowler::downloading(const std::string& host, const std::string& port, const std::string& target)
-{
-	http::response<http::dynamic_body> result;
-
-	if (port == HTTP_PORT)
-	{
-		result = httpRequest(host, port, target);
-	}
-	else if (port == HTTPS_PORT)
-	{
-		result = httpsRequest(host, port, target);
-	}
-	else
-	{
-		throw std::exception("Unknown port");
-	}
-
-	if (result.result_int() == 200)
-	{
-		return beast::buffers_to_string(result.body().data());
-	}
-	else if(result.result_int() > 300 || result.result_int() < 309)
-	{
-		URLParser url (result[http::field::location]);
-		if (!database->FindURL(url.get_string()))
-		{
-			std::unique_lock<std::mutex> ul(*m_ptr);
-			database->addDoc(url.get_string(), request);
-			ul.unlock();
-			return downloading(url.host, url.port, url.target);
-		}
-		else
-		{
-			throw std::exception("Return to visited url");
-		}
-	}
-	else
-	{
-		throw std::exception("Unknown HTTP code");
-	}
-}
-
 void Crowler::indexing(std::string& data,const std::string url)
 {
-	std::regex regular("(<[^>]*>|[[:punct:]]|[\tЧ\v\r\n\f])");
-	std::string clearText = regex_replace(data, regular, "");
-	boost::algorithm::to_lower(clearText);
+	//std::regex regular("(<[^>]*>|[[:punct:]]|[\tЧ\v\r\n\f])");
+	//std::string clearText = regex_replace(data, regular, "");
+	std::string& clearData = clearText(data);
+	boost::algorithm::to_lower(clearData);
 	int relevance = 0;
 	for (int i = 0; i < request.size(); ++i)
 	{
@@ -123,7 +158,7 @@ void Crowler::indexing(std::string& data,const std::string url)
 		int cursor = 0;
 		while (cursor != NOTFOUND)
 		{
-			cursor = clearText.find(request[i], cursor);
+			cursor = clearData.find(request[i], cursor);
 			if (cursor != NOTFOUND)
 			{
 				relevance++;
@@ -133,21 +168,6 @@ void Crowler::indexing(std::string& data,const std::string url)
 		std::unique_lock<std::mutex> ul(*m_ptr);
 		database->updateRelevance(url, request[i], relevance);
 	}
-}
-
-void Crowler::startWork(const std::vector<std::string>& _request)
-{
-	request = _request;
-	database->deleteAll();
-	for (int i = 0; i < request.size(); ++i)
-	{
-		database->addWord(request[i]);
-	}
-
-	URLParser starturl(startlink);
-	database->addDoc(starturl.get_string(), request);
-	threadPool->push(starturl, 1);
-	threadPool->startWork();
 }
 
 bool Crowler::isItLink(const std::string& ref)
@@ -161,12 +181,12 @@ bool Crowler::isItLink(const std::string& ref)
 
 http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host, const std::string& port, const std::string& target)
 {
-		//net::io_context ioc;
 		tcp::resolver resolver(ioc); 
 		beast::tcp_stream stream(ioc); 
 
 		auto const endPoint = resolver.resolve(host, port); 
 
+		boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(10));
 		stream.connect(endPoint);
 
 		http::request<http::string_body> req{ http::verb::get, target, HTTP_VERSION }; 
@@ -195,9 +215,7 @@ http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host,
 
 http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host, const std::string& port, const std::string& target)
 {
-		//net::io_context ioc;
-		//ssl::context ctx(ssl::context::tls_client);
-		ssl::stream<tcp::socket> stream(ioc, ctx);
+		ssl::stream<beast::tcp_stream> stream(ioc, ctx);
 		if (VERIFY_ENABLED)
 		{
 			stream.set_verify_mode(ssl::verify_peer);
@@ -209,6 +227,7 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 
 		tcp::resolver resolver(ioc);
 		
+		boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(10));
 		boost::beast::get_lowest_layer(stream).connect(*(resolver.resolve(host, port).begin()));
 	
 
@@ -237,8 +256,30 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 		if (ec) {
 			throw beast::system_error{ ec };
 		}
-		//std::cout << beast::buffers_to_string(res.body().data());
 		return res;
 }
 
-
+std::string& Crowler::clearText(std::string& data)
+{
+	for (int i = 0; i < data.size(); ++i)
+	{
+		if (data[i] == '<')
+		{
+			int length = 1;
+			int j = i;
+			do
+			{
+				++j;
+				++length;
+			} while (data[j] != '>');
+			data.erase(i, length);
+			--i;
+		}
+		else if (!((data[i] >= 48 && data[i] <= 57) || (data[i] >= 64 && data[i] <= 90) || (data[i] >= 97 && data[i] <= 122) || data[i] == ' '))
+		{
+			data.erase(i, 1);
+			--i;
+		}
+	}
+	return data;
+}

@@ -98,3 +98,22 @@ bool DB::FindURL(const std::string& url)
 	}
 	return true;
 }
+
+void DB::showResults()
+{
+	pqxx::work tx{ *c };
+	pqxx::result r = tx.exec("select d.document, sum(r.relevance) from relevants r "
+		"join documents d on r.document_id = d.id "
+		"group by d.document "
+		"having sum(r.relevance)>0 "
+		"order by sum DESC; ");
+	tx.commit();
+	for (auto row : r)
+	{
+		for (auto elem : row)
+		{
+			std::cout << elem.c_str() << "\t\t";
+		}
+		std::cout << std::endl;
+	}
+}

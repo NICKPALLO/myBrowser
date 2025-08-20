@@ -5,6 +5,7 @@
 #include<thread>
 #include<queue>
 #include<mutex>
+#include<atomic>
 
 #include "URLParser.h"
 
@@ -19,13 +20,17 @@ public:
 	std::pair<URLParser, int> pop();
 	bool get_workDone();
 	void set_workDone(const bool val);
+	void set_threadsNum(int _threadsNum);
 
 
 private:
-	std::shared_ptr<std::mutex> m_ptr;
+	std::unique_ptr<std::mutex> m_ptr_queue;
 	std::condition_variable cv;
 	std::queue<std::pair<URLParser, int>> queue;
-	bool workDone = false;
+	std::atomic_bool workDone = false;
+	std::atomic_int stoppedThreads = 0;
+	int threadsNum = 0;
+
 };
 
 
@@ -37,15 +42,11 @@ public:
 	ThreadPool(Crowler* _crowler);
 	void startWork();
 	void push(const URLParser& url, int recursionStep);
-
 private:
-	void inclreaseStoppedThreads();
-	void declreaseStoppedThreads();
 	void work();
-	int stoppedThreads=0;
-	int threadsNum=0;
+	int threadsNum = 0;
+
 	Crowler* crowler;
 	SafeQueue sq;
 	std::vector<std::thread> tasks;
-	std::shared_ptr<std::mutex> m_ptr;
 };
