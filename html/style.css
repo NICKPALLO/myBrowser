@@ -1,0 +1,51 @@
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.container {
+    margin-top: 15vh; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.search-box {
+    display: flex;
+    width: 65%;
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    flex: 1;
+    height: 35px;
+    border-radius: 15px;
+    padding: 0 15px;
+    box-sizing: border-box;
+}
+
+.search-box button {
+    margin-left: 10px;
+    height: 35px;
+    border-radius: 15px;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+
+ol {
+    width: 65%;
+    margin: 0;
+    overflow-wrap: break-word;
+}
+li{
+    margin:10px;
+}

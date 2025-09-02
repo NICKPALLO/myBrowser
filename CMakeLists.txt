@@ -19,6 +19,8 @@ set(PROJECT_SOURCES
 	URLParser.cpp
 	threadPool.cpp
 	logger.cpp
+	server.cpp
+	server_certificate.hpp
 )
 
 add_executable(MyBrowser ${PROJECT_SOURCES})
