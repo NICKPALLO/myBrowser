@@ -25,6 +25,7 @@ set(PROJECT_SOURCES
 	logger.cpp
 	server.cpp
 	server_certificate.hpp
+	iniParser.h
 )
 
 add_executable(MyBrowser ${PROJECT_SOURCES})

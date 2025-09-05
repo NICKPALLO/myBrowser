@@ -4,6 +4,7 @@
 #include "dataBase.h"
 #include "server.h"
 #include "logger.h"
+#include "iniParser.h"
 
 class MyBrowser
 {
@@ -17,13 +18,18 @@ private:
 	std::unique_ptr<Crowler> crowler;
 	std::unique_ptr<Server> server;
 
-	//данные ini файла
-	std::string DB_host = "localhost";
-	std::string DB_port = "5432";
-	std::string DB_name = "browserDB";
-	std::string DB_user = "postgres";
-	std::string DB_password = "1234";
+	std::unique_ptr<ini_parser> iniParser;
 
-	int recursionLength = 5;
-	std::string startlink = "https://www.wikipedia.org/";
+	//данные ini файла
+	std::string DB_host;
+	std::string DB_port;
+	std::string DB_name;
+	std::string DB_user;
+	std::string DB_password;
+
+	int recursionLength;
+	std::string startlink;
+
+	std::string server_ip;
+	int server_port;
 };
