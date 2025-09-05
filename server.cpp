@@ -28,25 +28,26 @@ void Server::fail(beast::error_code ec, char const* what)
 
 std::vector<std::string> Server::requestParser(std::string request)
 {
-    int a = request.find("query=");
-    int b = 0;
+    boost::algorithm::to_lower(request);
+    int begin = request.find("query=");
+    int end = 0;
     std::vector<std::string> v;
-    if (a != std::string::npos)
+    if (begin != NOTFOUND)
     {
-        a += 6;
-        while (b != std::string::npos)
+        begin += 6;
+        while (end != NOTFOUND)
         {
-            b = request.find(" ", a);
-            if (b != std::string::npos)
+            end = request.find("+", begin);
+            if (end != NOTFOUND)
             {
-                v.push_back(request.substr(a, b - a));
-                a = b + 1;
+                v.push_back(request.substr(begin, end - begin));
+                begin = end + 1;
             }
             else
             {
-                if (a != std::string::npos)
+                if (begin != NOTFOUND)
                 {
-                    v.push_back(request.substr(a, request.size() - a));
+                    v.push_back(request.substr(begin, request.size() - begin));
                 }
             }
         }
@@ -69,7 +70,7 @@ void Server::accepting()
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Ошибка: " << e.what() << std::endl;
+        std::cerr << "РћС€РёР±РєР°: " << e.what() << std::endl;
         log->add(e.what());
     }
 }
@@ -82,7 +83,7 @@ void Server::do_session(tcp::socket&& socket)
 
     stream.handshake(ssl::stream_base::server, ec);
     if (ec)
-        return fail(ec, "рукопожатие");
+        return fail(ec, "СЂСѓРєРѕРїРѕР¶Р°С‚РёРµ");
 
 
     beast::flat_buffer buffer;
@@ -128,7 +129,7 @@ http::message_generator Server::handle_request(http::request<http::string_body>&
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
             res.set(http::field::content_type, "text/html");
             res.keep_alive(false);
-            res.body() = "Ресурс '" + std::string(target) + "' не найден.";
+            res.body() = "Р РµСЃСѓСЂСЃ '" + std::string(target) + "' РЅРµ РЅР°Р№РґРµРЅ.";
             res.prepare_payload();
             return res;
         };
@@ -137,16 +138,16 @@ http::message_generator Server::handle_request(http::request<http::string_body>&
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
             res.set(http::field::content_type, "text/html");
             res.keep_alive(false);
-            res.body() = "Произошла ошибка: '" + std::string(what) + "'";
+            res.body() = "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°: '" + std::string(what) + "'";
             res.prepare_payload();
             return res;
         };
 
     if (req.method() != http::verb::get && req.method() != http::verb::post)
-        return bad_request("Неизвестный HTTP-метод");
+        return bad_request("РќРµРёР·РІРµСЃС‚РЅС‹Р№ HTTP-РјРµС‚РѕРґ");
 
     if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != beast::string_view::npos)
-        return bad_request("Недопустимый путь запроса");
+        return bad_request("РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ РїСѓС‚СЊ Р·Р°РїСЂРѕСЃР°");
 
     std::string htmlText = startHtml;
 
@@ -246,7 +247,7 @@ void Server::readHtml(std::string& text)
     }
     else
     {
-        throw std::exception("Не удалось открыть HTML файл");
+        throw std::exception("РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ HTML С„Р°Р№Р»");
     }
 }
 
@@ -270,9 +271,9 @@ void Server::writeHtmlAnswer(std::string& text, const std::vector<std::string>& 
         int begin = text.find("<ol>");
         begin += 4;
         std::string resultList;
-        for (const auto& i : results)
+        for (int i = 0; i < results.size(); ++i)
         {
-            resultList += "<li>" + i + "</li>\n";
+            resultList += "<li><a href=\"" + results[i] + "\">" + results[i] + "</a></li>\n";
         }
         text.insert(begin, resultList);
     }
@@ -280,6 +281,6 @@ void Server::writeHtmlAnswer(std::string& text, const std::vector<std::string>& 
     {
         int begin = text.find("<p>");
         begin += 3;
-        text.insert(begin, "По данному запросу ничего не найдено");
+        text.insert(begin, "РџРѕ РґР°РЅРЅРѕРјСѓ Р·Р°РїСЂРѕСЃСѓ РЅРёС‡РµРіРѕ РЅРµ РЅР°Р№РµРЅРѕ");
     }
 }

@@ -1,4 +1,4 @@
-﻿#include "MyBrowser.h"
+#include "MyBrowser.h"
 #include <iostream>
 
 #include <Windows.h>
@@ -26,8 +26,8 @@ void MyBrowser::start()
 
 int main()
 {
-    SetConsoleCP(1251);
-    SetConsoleOutputCP(1251);
+    SetConsoleCP(65001);
+    SetConsoleOutputCP(65001);
 
     MyBrowser myBrowser;
     myBrowser.start();

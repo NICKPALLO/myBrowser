@@ -221,7 +221,7 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 		req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 		req.set(http::field::connection, "close");
 
-		//шифрование
+		//С€РёС„СЂРѕРІР°РЅРёРµ
 		stream.handshake(ssl::stream_base::client);
 
 

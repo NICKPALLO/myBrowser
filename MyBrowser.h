@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "crowler.h"
 #include "dataBase.h"
@@ -15,7 +15,6 @@ private:
 	std::shared_ptr<Logger> log;
 
 	std::unique_ptr<Crowler> crowler;
-	//Server server;
 	std::unique_ptr<Server> server;
 
 	//данные ini файла
@@ -25,6 +24,6 @@ private:
 	std::string DB_user = "postgres";
 	std::string DB_password = "1234";
 
-	int recursionLength = 4;
+	int recursionLength = 5;
 	std::string startlink = "https://www.wikipedia.org/";
 };

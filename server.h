@@ -9,10 +9,15 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/core/stream_traits.hpp>
 
+#include <boost/algorithm/string.hpp>
+
 #include "logger.h"
 #include "database.h"
 #include <fstream>
 
+#ifndef NOTFOUND
+#define NOTFOUND std::string::npos
+#endif
 
 using namespace boost::asio;
 using namespace boost::asio::ip;
