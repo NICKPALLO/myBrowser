@@ -9,7 +9,7 @@
 #include <string>
 #include <iostream>
 #include <regex>
-
+#include <unordered_map>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -23,7 +23,12 @@
 //#include <boost/locale.hpp>
 #include <boost/algorithm/string.hpp>
 
-
+#ifndef MAXWORDLENGTH
+#define MAXWORDLENGTH 30
+#endif
+#ifndef MINWORDLENGTH
+#define MINWORDLENGTH 3
+#endif
 #ifndef NOTFOUND
 #define NOTFOUND std::string::npos
 #endif
@@ -55,8 +60,8 @@ using tcp = net::ip::tcp;
 class Crowler
 {
 public:
-	Crowler();
-	void startWork(const std::vector<std::string>& _request);
+	Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_);
+	void startWork();
 	void searching(const URLParser& url, const int recursionStep);
 private:
 	std::string downloading(const std::string& host, const std::string& port, const std::string& target);
@@ -64,26 +69,19 @@ private:
 	void indexing(std::string& data, const std::string url);
 	bool isItLink(const std::string& ref);
 	std::string& clearText(std::string& data);
+	std::unordered_map<std::string, int> writeWords(std::string& data);
 	http::response<http::dynamic_body> httpRequest(const std::string& host, const std::string& port, const std::string& target);
 	http::response<http::dynamic_body> httpsRequest(const std::string& host, const std::string& port, const std::string& target);
 
-	Logger log;
-	std::vector<std::string> request;
-	std::unique_ptr<DB> database;
+	std::shared_ptr<Logger> log;
+	std::shared_ptr<DB> database;
 	std::unique_ptr<ThreadPool> threadPool;
 	std::unique_ptr<std::mutex> m_ptr;
 
 	net::io_context ioc; 
 	ssl::context ctx;
 
-	//данные ini файла
-	std::string DB_host = "localhost";
-	std::string DB_port = "5432";
-	std::string DB_name = "browserDB";
-	std::string DB_user = "postgres";
-	std::string DB_password = "1234";
-
-	int recursionLength = 3;
-	std::string startlink = "https://www.wikipedia.org/";
+	int recursionLength;
+	std::string startlink;
 };
 

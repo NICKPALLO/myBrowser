@@ -2,49 +2,42 @@
 #include <algorithm>
 
 
-Crowler::Crowler() : ctx(ssl::context::tls_client) 
+Crowler::Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_) : ctx(ssl::context::tls_client)
 {
 	m_ptr = std::make_unique<std::mutex>();
 	threadPool = std::make_unique<ThreadPool>(this);
+	recursionLength = recursionLength_;
+	startlink = startlink_;
+	log = log_;
 	if (VERIFY_ENABLED)
 	{
 		ctx.set_default_verify_paths();
 	}
 	try
 	{
-		database = std::make_unique<DB>(DB_host, DB_port, DB_name, DB_user, DB_password);
+		database = database_;
 	}
 	catch (std::exception ex)
 	{
 		std::cerr << ex.what() << std::endl;
-		log.add(ex.what());
+		log->add(ex.what());
 	}
 }
 
-void Crowler::startWork(const std::vector<std::string>& _request)
+void Crowler::startWork()
 {
-	request = _request;
 	try
 	{
 		database->deleteAll();
-		for (int i = 0; i < request.size(); ++i)
-		{
-			database->addWord(request[i]);
-		}
 		URLParser starturl(startlink);
-		database->addDoc(starturl.get_string(), request);
+		database->addDoc(starturl.get_string());
 		threadPool->push(starturl, 1);
 		threadPool->startWork();
-
-		std::cout << std::endl;
-		std::cout << "---------------------------------------------------";
-		std::cout << std::endl;
-		database->showResults();
 	}
 	catch (std::exception ex)
 	{
 		std::cerr << ex.what() << std::endl;
-		log.add(ex.what());
+		log->add(ex.what());
 	}
 }
 
@@ -61,7 +54,7 @@ void Crowler::searching(const URLParser& url, const int recursionStep)
 	}
 	catch(std::exception ex)
 	{
-		log.add(ex.what());
+		log->add(ex.what());
 	}
 }
 
@@ -89,10 +82,10 @@ std::string Crowler::downloading(const std::string& host, const std::string& por
 	else if (result.result_int() > 300 || result.result_int() < 309)
 	{
 		URLParser url(result[http::field::location]);
-		if (!database->FindURL(url.get_string()))
+		if (!database->findURL(url.get_string()))
 		{
 			std::unique_lock<std::mutex> ul(*m_ptr);
-			database->addDoc(url.get_string(), request);
+			database->addDoc(url.get_string());
 			ul.unlock();
 			return downloading(url.host, url.port, url.target);
 		}
@@ -137,9 +130,9 @@ void Crowler::linkSearching(const std::string& responce, const int recursionStep
 			links[i][links[i].size() - 1] = '/';
 		}
 		std::unique_lock<std::mutex> ul(*m_ptr);
-		if (!database->FindURL(links[i]))
+		if (!database->findURL(links[i]))
 		{
-			database->addDoc(links[i],request);
+			database->addDoc(links[i]);
 			threadPool->push(URLParser(links[i]), recursionStep + 1);
 		}
 	}
@@ -147,26 +140,18 @@ void Crowler::linkSearching(const std::string& responce, const int recursionStep
 
 void Crowler::indexing(std::string& data,const std::string url)
 {
-	//std::regex regular("(<[^>]*>|[[:punct:]]|[\t—\v\r\n\f])");
-	//std::string clearText = regex_replace(data, regular, "");
 	std::string& clearData = clearText(data);
 	boost::algorithm::to_lower(clearData);
-	int relevance = 0;
-	for (int i = 0; i < request.size(); ++i)
+	std::unordered_map<std::string, int> words = writeWords(clearData);
+
+	std::unique_lock<std::mutex> ul(*m_ptr);
+	for (const auto& i : words)
 	{
-		int relevance = 0;
-		int cursor = 0;
-		while (cursor != NOTFOUND)
+		if (!database->findWord(i.first))
 		{
-			cursor = clearData.find(request[i], cursor);
-			if (cursor != NOTFOUND)
-			{
-				relevance++;
-				cursor += request[i].size();
-			}
+			database->addWord(i.first);
 		}
-		std::unique_lock<std::mutex> ul(*m_ptr);
-		database->updateRelevance(url, request[i], relevance);
+		database->addRelevance(url, i.first, i.second);
 	}
 }
 
@@ -275,11 +260,47 @@ std::string& Crowler::clearText(std::string& data)
 			data.erase(i, length);
 			--i;
 		}
-		else if (!((data[i] >= 48 && data[i] <= 57) || (data[i] >= 64 && data[i] <= 90) || (data[i] >= 97 && data[i] <= 122) || data[i] == ' '))
+		else if (!((data[i] >= 48 && data[i] <= 57) || (data[i] >= 64 && data[i] <= 90) 
+			|| (data[i] >= 97 && data[i] <= 122) || data[i] == ' ')
+			|| (data[i] == ' ' && data[i+1] == ' '))
 		{
 			data.erase(i, 1);
 			--i;
 		}
 	}
 	return data;
+}
+
+std::unordered_map<std::string,int> Crowler::writeWords(std::string& data)
+{
+	std::unordered_map<std::string, int> words;
+	int a = 0;
+	int b = 0;
+	while (b != NOTFOUND)
+	{
+		b = data.find(' ', a);
+		if (b == NOTFOUND)
+		{
+			if (data.size() - a > MAXWORDLENGTH || data.size() - a < MINWORDLENGTH)
+			{
+				data.erase(a);
+			}
+			else
+			{
+				words[data.substr(a, data.size() - a)]++;
+			}
+		}
+		else if (b - a > MAXWORDLENGTH || b - a < MINWORDLENGTH)
+		{
+			data.erase(a, b - a + 1);
+			b = a;
+		}
+		else
+		{
+			words[data.substr(a, b - a)]++;
+			a = b + 1;
+		}
+	}
+	//return std::move(words);
+	return words; //NRVO
 }
