@@ -31,24 +31,13 @@ void DB::createTables()
 void DB::addDoc(const std::string& url)
 {
 	pqxx::work tx{ *c };
-	//tx.exec("SET CLIENT_ENCODING TO 'WIN1251';");
 	tx.exec("insert into Documents(document) values ('" + tx.esc(url) + "')");
 	tx.commit();
 }
 
-//void DB::updateRelevance(const std::string& url, const std::string& word, const int relevance)
-//{
-//	pqxx::work tx{ *c };
-//	tx.exec("update relevants set relevance = " + std::to_string(relevance) +
-//		" where document_id = (select id from documents where document = '" + tx.esc(url) + "')"
-//		" and word_id = (select id from words where word = '"+ tx.esc(word) +"'); ");
-//	tx.commit();
-//}
-
 void DB::addWord(const std::string& word)
 {
 	pqxx::work tx{ *c };
-	//tx.exec("SET CLIENT_ENCODING TO 'WIN1251';");
 	tx.exec("insert into Words(word) values ('" + tx.esc(word) + "')");
 	tx.commit();
 }
@@ -88,15 +77,6 @@ std::vector<std::string> DB::getResults(const std::vector<std::string>& reqWords
 	}
 	return results;
 }
-
-//int DB::getRelevance(const std::string& url)
-//{
-//	pqxx::work tx{ *c };
-//	pqxx::result r = tx.exec("select SUM(relevance) from relevants r "
-//		"where r.document_id = (select id from documents where document = '"+ tx.esc(url) +"');");
-//	tx.commit();
-//	return r.at(0, 0).as<int>();
-//}
 
 void DB::deleteAll()
 {
@@ -146,22 +126,3 @@ bool DB::findWord(const std::string& word)
 	}
 	return true;
 }
-
-//void DB::showResults()
-//{
-//	pqxx::work tx{ *c };
-//	pqxx::result r = tx.exec("select d.document, sum(r.relevance) from relevants r "
-//		"join documents d on r.document_id = d.id "
-//		"group by d.document "
-//		"having sum(r.relevance)>0 "
-//		"order by sum DESC; ");
-//	tx.commit();
-//	for (auto row : r)
-//	{
-//		for (auto elem : row)
-//		{
-//			std::cout << elem.c_str() << "\t\t";
-//		}
-//		std::cout << std::endl;
-//	}
-//}

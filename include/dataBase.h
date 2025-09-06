@@ -10,8 +10,6 @@ public:
 	void createTables();
 	void addDoc(const std::string& url);
 	void addWord(const std::string& word);
-	//void updateRelevance(const std::string& url, const std::string& word, const int relevance);
-	//int getRelevance(const std::string& url);
 	bool isEmpty();
 	bool findURL(const std::string& url);
 	bool findWord(const std::string& word);
