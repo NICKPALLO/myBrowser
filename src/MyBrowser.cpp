@@ -1,7 +1,4 @@
 #include "MyBrowser.h"
-#include <iostream>
-
-#include <Windows.h>
 
 
 MyBrowser::MyBrowser()
@@ -43,14 +40,4 @@ void MyBrowser::start()
     }
     std::cout << "Сервер запущен...\n";
     server->accepting();
-}
-
-int main()
-{
-    SetConsoleCP(65001);
-    SetConsoleOutputCP(65001);
-
-    MyBrowser myBrowser;
-    myBrowser.start();
-	return 0;
 }

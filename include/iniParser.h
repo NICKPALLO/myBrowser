@@ -1,13 +1,12 @@
 #pragma once
-//ќб€зательно дл€ компил€ции
 #include <fstream>
 #include <string>
 
 class ini_parser
 {
 public:
-	ini_parser(std::string filename);
-	~ini_parser();
+	inline ini_parser(std::string filename);
+	inline ~ini_parser();
 
 	ini_parser(const ini_parser& other) = delete;
 	ini_parser(ini_parser&& other) = delete;
@@ -18,23 +17,23 @@ public:
 	T get_value(std::string section, std::string valueName);
 
 private:
-	bool find_Section(std::string& section);
+	inline bool find_Section(std::string& section);
 
 	template <class T>
 	T find_Value(std::string& valueName);
 
-	void next_line();
+	inline void next_line();
 
 	template <class T>
 	T read_Value();
 	template <>
-	std::string read_Value();
+	inline std::string read_Value();
 
 	std::ifstream fin;
 };
 
 
-ini_parser::ini_parser(std::string filename)
+inline ini_parser::ini_parser(std::string filename)
 {
 	fin.open(filename);
 	if (!fin.is_open())
@@ -43,7 +42,7 @@ ini_parser::ini_parser(std::string filename)
 	}
 }
 
-ini_parser::~ini_parser()
+inline ini_parser::~ini_parser()
 {
 	fin.close();
 }
@@ -60,7 +59,7 @@ T ini_parser::get_value(std::string section, std::string valueName)
 	return find_Value<T>(valueName);
 }
 
-bool ini_parser::find_Section(std::string& section)
+inline bool ini_parser::find_Section(std::string& section)
 {
 	std::string buff = "";
 	do
@@ -109,7 +108,7 @@ T ini_parser::find_Value(std::string& value)
 	return read_Value<T>();
 }
 
-void ini_parser::next_line()
+inline void ini_parser::next_line()
 {
 	char nextSymb = ' ';
 	while (nextSymb != '\n' && !fin.eof())
@@ -152,7 +151,7 @@ T ini_parser::read_Value()
 }
 
 template <>
-std::string ini_parser::read_Value()
+inline std::string ini_parser::read_Value()
 {
 	char nextSymb = ' ';
 	std::string buff = "";

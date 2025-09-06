@@ -1,5 +1,5 @@
 #pragma once
-
+#include <iostream>
 #include "crowler.h"
 #include "dataBase.h"
 #include "server.h"
