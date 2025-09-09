@@ -5,6 +5,7 @@
 #include "server.h"
 #include "logger.h"
 #include "iniParser.h"
+#include <thread>
 
 class MyBrowser
 {

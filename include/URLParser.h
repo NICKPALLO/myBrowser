@@ -16,6 +16,7 @@ class URLParser
 {
 public:
 	URLParser(const std::string& url);
+	std::string get_path() const;
 	std::string get_string() const;
 	std::string host;
 	std::string port;

@@ -4,7 +4,7 @@
 
 Crowler::Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_) : ctx(ssl::context::tls_client)
 {
-	m_ptr = std::make_unique<std::mutex>();
+	//m_ptr = std::make_unique<std::mutex>();
 	threadPool = std::make_unique<ThreadPool>(this);
 	recursionLength = recursionLength_;
 	startlink = startlink_;
@@ -48,7 +48,7 @@ void Crowler::searching(const URLParser& url, const int recursionStep)
 		std::string responce = downloading(url.host, url.port, url.target);
 		if (recursionStep < recursionLength)
 		{
-			linkSearching(responce, recursionStep);
+			linkSearching(url, responce, recursionStep);
 		}
 		indexing(responce, url.get_string());
 	}
@@ -84,9 +84,7 @@ std::string Crowler::downloading(const std::string& host, const std::string& por
 		URLParser url(result[http::field::location]);
 		if (!database->findURL(url.get_string()))
 		{
-			std::unique_lock<std::mutex> ul(*m_ptr);
 			database->addDoc(url.get_string());
-			ul.unlock();
 			return downloading(url.host, url.port, url.target);
 		}
 		else
@@ -100,7 +98,7 @@ std::string Crowler::downloading(const std::string& host, const std::string& por
 	}
 }
 
-void Crowler::linkSearching(const std::string& responce, const int recursionStep)
+void Crowler::linkSearching(const URLParser& url, const std::string& responce, const int recursionStep)
 {
 	std::vector<std::string> links;
 	int beginLink = 0;
@@ -117,23 +115,32 @@ void Crowler::linkSearching(const std::string& responce, const int recursionStep
 		if (endLink != NOTFOUND)
 		{
 			std::string ref = responce.substr(beginLink, endLink - beginLink);
-			if (isItLink(ref))
+			if (ref.empty())
 			{
-				links.push_back(ref);
+				continue;
 			}
+			if (ref.find("//") != NOTFOUND)
+			{
+				ref = url.port == HTTPS_PORT ? "https:" + ref : "http:" + ref;
+			}
+			else if (ref[0] == '/')
+			{
+				ref = url.port == HTTPS_PORT ? "https://" + url.host + ref : "http://" + url.host + ref;
+			}
+			else if (!isItUrl(ref))
+			{
+				ref = url.get_path() + ref;
+			}
+			links.push_back(ref);
 		}
 	}
 	for (int i = 0; i < links.size(); ++i)
 	{
-		if (links[i][links[i].size() - 1] != '/')
+		URLParser url(links[i]);
+		if (!database->findURL(url.get_string()))
 		{
-			links[i][links[i].size() - 1] = '/';
-		}
-		std::unique_lock<std::mutex> ul(*m_ptr);
-		if (!database->findURL(links[i]))
-		{
-			database->addDoc(links[i]);
-			threadPool->push(URLParser(links[i]), recursionStep + 1);
+			database->addDoc(url.get_string());
+			threadPool->push(url, recursionStep + 1);
 		}
 	}
 }
@@ -144,7 +151,6 @@ void Crowler::indexing(std::string& data,const std::string url)
 	boost::algorithm::to_lower(clearData);
 	std::unordered_map<std::string, int> words = writeWords(clearData);
 
-	std::unique_lock<std::mutex> ul(*m_ptr);
 	for (const auto& i : words)
 	{
 		if (!database->findWord(i.first))
@@ -155,7 +161,7 @@ void Crowler::indexing(std::string& data,const std::string url)
 	}
 }
 
-bool Crowler::isItLink(const std::string& ref)
+bool Crowler::isItUrl(const std::string& ref)
 {
 	if (ref.find("https://") != NOTFOUND || ref.find("http://") != NOTFOUND)
 	{
@@ -168,13 +174,12 @@ http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host,
 {
 		tcp::resolver resolver(ioc); 
 		beast::tcp_stream stream(ioc); 
-
-		auto const endPoint = resolver.resolve(host, port); 
+		auto const endPoint = resolver.resolve(host, port);
 
 		boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(10));
 		stream.connect(endPoint);
 
-		http::request<http::string_body> req{ http::verb::get, target, HTTP_VERSION }; 
+		http::request<http::string_body> req{ http::verb::get, target, HTTP_VERSION };
 		req.set(http::field::host, host);
 		req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 		req.set(http::field::connection, "close");
@@ -190,12 +195,13 @@ http::response<http::dynamic_body> Crowler::httpRequest(const std::string& host,
 
 		beast::error_code ec;
 		stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-	
+
 
 		if (ec && ec != beast::errc::not_connected)
 			throw beast::system_error{ ec };
-		
+
 		return res;
+
 }
 
 http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host, const std::string& port, const std::string& target)
@@ -210,19 +216,28 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 			stream.set_verify_mode(ssl::verify_none);
 		}
 
+		//Установить имя хоста SNI (многим хостам это необходимо для успешного установления соединения) 
+		if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
+		{
+			boost::system::error_code ec{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() };
+			throw boost::system::system_error{ ec };
+		}
+		// Устанавливаем ожидаемое имя хоста в сертификате однорангового узла для проверки
+		stream.set_verify_callback(ssl::host_name_verification(host));
+
 		tcp::resolver resolver(ioc);
-		
+
 		boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(10));
 		boost::beast::get_lowest_layer(stream).connect(*(resolver.resolve(host, port).begin()));
-	
 
+
+		stream.handshake(ssl::stream_base::client);
+
+		//создаем запрос
 		http::request<http::string_body> req{ http::verb::get, target, HTTP_VERSION };
 		req.set(http::field::host, host);
 		req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 		req.set(http::field::connection, "close");
-
-		//шифрование
-		stream.handshake(ssl::stream_base::client);
 
 
 		http::write(stream, req);
@@ -230,7 +245,6 @@ http::response<http::dynamic_body> Crowler::httpsRequest(const std::string& host
 		beast::flat_buffer buffer;
 		http::response<http::dynamic_body> res;
 		http::read(stream, buffer, res);
-
 
 		beast::error_code ec;
 		stream.shutdown(ec);

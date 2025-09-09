@@ -44,6 +44,25 @@ URLParser::URLParser(const std::string& url)
 	}
 
 }
+std::string URLParser::get_path() const
+{
+	if (target[target.size() - 1] == '/')
+	{
+		return get_string();
+	}
+	int a = 0;
+	int b = 0;
+	do
+	{
+		b = a;
+		a = target.find("/",b+1);
+	} while (a != NOTFOUND);
+	if (port == HTTPS_PORT)
+	{
+		return "https://" + host + target.substr(0, b+1);
+	}
+	return "http://" + host + target.substr(0, b+1);
+}
 
 std::string URLParser::get_string() const
 {

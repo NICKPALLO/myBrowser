@@ -2,6 +2,7 @@
 #include <pqxx/pqxx>
 #include<iostream>
 #include <vector>
+#include <mutex>
 
 class DB
 {
@@ -17,6 +18,7 @@ public:
 	std::vector<std::string> getResults(const std::vector<std::string>& reqWords);
 	void deleteAll();
 private:
+	std::unique_ptr<std::mutex> m_ptr;
 	std::string host;
 	std::string port;
 	std::string dbname;

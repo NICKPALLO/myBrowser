@@ -28,9 +28,9 @@ public:
 	void searching(const URLParser& url, const int recursionStep);
 private:
 	std::string downloading(const std::string& host, const std::string& port, const std::string& target);
-	void linkSearching(const std::string& responce, const int recursionStep);
+	void linkSearching(const URLParser& url, const std::string& responce, const int recursionStep);
 	void indexing(std::string& data, const std::string url);
-	bool isItLink(const std::string& ref);
+	bool isItUrl(const std::string& ref);
 	std::string& clearText(std::string& data);
 	std::unordered_map<std::string, int> writeWords(std::string& data);
 	http::response<http::dynamic_body> httpRequest(const std::string& host, const std::string& port, const std::string& target);
@@ -39,7 +39,6 @@ private:
 	std::shared_ptr<Logger> log;
 	std::shared_ptr<DB> database;
 	std::unique_ptr<ThreadPool> threadPool;
-	std::unique_ptr<std::mutex> m_ptr;
 
 	net::io_context ioc; 
 	ssl::context ctx;

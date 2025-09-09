@@ -32,12 +32,7 @@ MyBrowser::MyBrowser()
 
 void MyBrowser::start()
 {
-    if (database->isEmpty())
-    {
-        std::cout << "Выполняется парсинг сайтов\n";
-        crowler->startWork();
-        std::cout << "Парсинг сайтов завершен!\n\n";
-    }
-    std::cout << "Сервер запущен...\n";
-    server->accepting();
+    std::cout << "Сервер и поисковик запущены...\n";
+    std::thread{ &Crowler::startWork, crowler.get()}.detach();
+    std::thread{ &Server::accepting, server.get() }.join();
 }
