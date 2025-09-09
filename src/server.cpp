@@ -5,7 +5,6 @@
 
 Server::Server(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, std::string ip_adress, int port) : ctx{ ssl::context::tls_server}
 {
-    m_ptr = std::make_unique<std::mutex>();
     database = database_;
     log = log_;
     acceptor = std::make_unique<tcp::acceptor>(ioc, tcp::endpoint(net::ip::make_address(ip_adress), port));
@@ -22,7 +21,6 @@ Server::Server(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, std:
 
 void Server::fail(beast::error_code ec, char const* what)
 {
-    std::unique_lock<std::mutex> ul(*m_ptr);
     log->add(what + ec.message());
 }
 
@@ -182,9 +180,7 @@ http::message_generator Server::handle_request(http::request<http::string_body>&
         std::vector<std::string> results;
         if (!reqWords.empty())
         {
-            std::unique_lock<std::mutex> ul(*m_ptr);
             results = database->getResults(reqWords);
-            ul.unlock();
         }
         writeHtmlAnswer(htmlText, results);
     }

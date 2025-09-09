@@ -26,7 +26,6 @@ private:
 
 	std::shared_ptr<Logger> log;
 	std::shared_ptr<DB> database;
-	std::unique_ptr<std::mutex> m_ptr;
 
 	net::io_context ioc;
 	ssl::context ctx;

@@ -4,7 +4,6 @@
 
 Crowler::Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_) : ctx(ssl::context::tls_client)
 {
-	//m_ptr = std::make_unique<std::mutex>();
 	threadPool = std::make_unique<ThreadPool>(this);
 	recursionLength = recursionLength_;
 	startlink = startlink_;
