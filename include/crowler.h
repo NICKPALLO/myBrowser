@@ -26,6 +26,7 @@ public:
 	Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_);
 	void startWork();
 	void searching(const URLParser& url, const int recursionStep);
+	void exit();
 private:
 	std::string downloading(const std::string& host, const std::string& port, const std::string& target);
 	void linkSearching(const URLParser& url, const std::string& responce, const int recursionStep);

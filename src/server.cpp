@@ -3,12 +3,16 @@
 
 #include <iostream>
 
-Server::Server(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, std::string ip_adress, int port) : ctx{ ssl::context::tls_server}
+
+//server
+Server::Server(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, std::string ip_adress, int port, int threadsNum_)
+    : ctx{ ssl::context::tls_server }, ioc{ threadsNum_ }
 {
-    m_ptr = std::make_unique<std::mutex>();
+    threadsNum = threadsNum_;
     database = database_;
     log = log_;
     acceptor = std::make_unique<tcp::acceptor>(ioc, tcp::endpoint(net::ip::make_address(ip_adress), port));
+    load_server_certificate(ctx);
     try
     {
         readHtml(startHtml);
@@ -20,127 +24,201 @@ Server::Server(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, std:
     }
 }
 
-void Server::fail(beast::error_code ec, char const* what)
-{
-    std::unique_lock<std::mutex> ul(*m_ptr);
-    log->add(what + ec.message());
-}
-
-std::vector<std::string> Server::requestParser(std::string request)
-{
-    boost::algorithm::to_lower(request);
-    int begin = request.find("query=");
-    int end = 0;
-    std::vector<std::string> v;
-    if (begin != NOTFOUND)
-    {
-        begin += 6;
-        while (end != NOTFOUND)
-        {
-            end = request.find("+", begin);
-            if (end != NOTFOUND)
-            {
-                v.push_back(request.substr(begin, end - begin));
-                begin = end + 1;
-            }
-            else
-            {
-                if (begin != NOTFOUND)
-                {
-                    v.push_back(request.substr(begin, request.size() - begin));
-                }
-            }
-        }
-    }
-    return v; //NRVO
-}
-
-void Server::accepting()
+void Server::startwork()
 {
     try
     {
-        load_server_certificate(ctx);
-        for (;;)
-        {
-            tcp::socket socket{ ioc };
-
-            acceptor->accept(socket);
-            std::thread{ &Server::do_session, this, std::move(socket) }.detach();
-        }
+        async_accepting();
+        std::vector<std::thread> v;
+        v.reserve(threadsNum - 1);
+        for (auto i = threadsNum - 1; i > 0; --i)
+            v.emplace_back([this] {ioc.run(); });
+        ioc.run();
     }
-    catch (const std::exception& e)
+    catch (std::exception ex)
     {
-        std::cerr << "Ошибка: " << e.what() << std::endl;
-        log->add(e.what());
+        std::cerr << ex.what();
+        log->add(ex.what());
     }
 }
 
-void Server::do_session(tcp::socket&& socket)
+void Server::close_server()
 {
+    exit = true;
     beast::error_code ec;
-
-    ssl::stream<tcp::socket&> stream{ socket, ctx };
-
-    stream.handshake(ssl::stream_base::server, ec);
+    acceptor->close(ec);
     if (ec)
-        return fail(ec, "рукопожатие");
-
-
-    beast::flat_buffer buffer;
-
-    for (;;)
     {
-        http::request<http::string_body> req;
-        http::read(stream, buffer, req, ec);
-        if (ec == http::error::end_of_stream)
-            break;
-        if (ec)
-            return fail(ec, "read");
-
-        http::message_generator msg = handle_request(std::move(req));
-
-        bool keep_alive = msg.keep_alive();
-
-        beast::write(stream, std::move(msg), ec);
-
-        if (!keep_alive)
-        {
-            break;
+        if (ec == net::error::operation_aborted) {
+            // это нормальное завершение работы acceptor
+            std::cout << "Acceptor stopped\n";
+            return;
         }
+        fail(ec, "accept");
     }
-    stream.shutdown(ec);
+    //ioc.stop();
+}
+
+void Server::async_accepting()
+{
+    acceptor->async_accept(net::make_strand(ioc), beast::bind_front_handler(&Server::async_accept, this));
+}
+
+void Server::async_accept(beast::error_code ec, tcp::socket socket)
+{
+    if (ec)
+    {
+        fail(ec, "accept");
+        return;
+    }
+    else
+    {
+        std::make_shared<session>(std::move(socket), ctx, startHtml, database, log)->run();
+    }
+    async_accepting();
+}
+
+void Server::readHtml(std::string& text)
+{
+    std::ifstream file;
+    file.open("../../../html/index.html");
+    if (file.is_open())
+    {
+        std::string buf;
+        while (!file.eof())
+        {
+            std::getline(file, buf);
+            text += buf + '\n';
+        }
+        file.close();
+    }
+    else
+    {
+        throw std::exception("Не удалось открыть HTML файл");
+    }
+}
+
+void Server::fail(beast::error_code ec, char const* what)
+{
+    //std::unique_lock<std::mutex> ul(*m_ptr);
+    log->add(what + ec.message());
+}
+
+
+//session
+session::session(tcp::socket&& socket, ssl::context& ctx, std::string& startHtml_,
+    std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_)
+    : stream(std::move(socket), ctx)
+{
+    startHtml = startHtml_;
+    database = database_;
+    log = log_;
+}
+
+void session::run()
+{
+    net::dispatch(stream.get_executor(), beast::bind_front_handler(&session::on_run, shared_from_this()));
+}
+
+void session::on_run()
+{
+    beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+
+    stream.async_handshake(ssl::stream_base::server, beast::bind_front_handler(&session::on_handshake, shared_from_this()));
+}
+
+void session::on_handshake(beast::error_code ec)
+{
+    if (ec)
+        return fail(ec, "handshake");
+
+    do_read();
+}
+
+void session::do_read()
+{
+    req = {};
+
+    beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+
+    http::async_read(stream, buffer, req, beast::bind_front_handler(&session::on_read, shared_from_this()));
+}
+
+void session::on_read(beast::error_code ec, std::size_t bytes_transferred)
+{
+    boost::ignore_unused(bytes_transferred);
+
+    if (ec == http::error::end_of_stream)
+        return do_close();
+
+    if (ec)
+        return fail(ec, "read");
+
+    send_response(handle_request(std::move(req)));
+}
+
+void session::send_response(http::message_generator&& msg)
+{
+    bool keep_alive = msg.keep_alive();
+
+    beast::async_write(stream, std::move(msg), beast::bind_front_handler(&session::on_write, this->shared_from_this(), keep_alive));
+}
+
+void session::on_write(bool keep_alive, beast::error_code ec, std::size_t bytes_transferred)
+{
+    boost::ignore_unused(bytes_transferred);
+
+    if (ec)
+        return fail(ec, "write");
+
+    if (!keep_alive)
+    {
+        return do_close();
+    }
+    do_read();
+}
+
+void session::do_close()
+{
+    beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+
+    stream.async_shutdown(beast::bind_front_handler(&session::on_shutdown, shared_from_this()));
+}
+
+void session::on_shutdown(beast::error_code ec)
+{
     if (ec)
         return fail(ec, "shutdown");
 }
 
-http::message_generator Server::handle_request(http::request<http::string_body>&& req)
+http::message_generator session::handle_request(http::request<http::string_body>&& req)
 {
     auto const bad_request = [&req](beast::string_view why) {
-            http::response<http::string_body> res{ http::status::bad_request, req.version() };
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/html");
-            res.keep_alive(false);
-            res.body() = std::string(why);
-            res.prepare_payload();
-            return res;
+        http::response<http::string_body> res{ http::status::bad_request, req.version() };
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(false);
+        res.body() = std::string(why);
+        res.prepare_payload();
+        return res;
         };
     auto const not_found = [&req](beast::string_view target) {
-            http::response<http::string_body> res{ http::status::not_found, req.version() };
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/html");
-            res.keep_alive(false);
-            res.body() = "Ресурс '" + std::string(target) + "' не найден.";
-            res.prepare_payload();
-            return res;
+        http::response<http::string_body> res{ http::status::not_found, req.version() };
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(false);
+        res.body() = "Ресурс '" + std::string(target) + "' не найден.";
+        res.prepare_payload();
+        return res;
         };
     auto const server_error = [&req](beast::string_view what) {
-            http::response<http::string_body> res{ http::status::internal_server_error, req.version() };
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/html");
-            res.keep_alive(false);
-            res.body() = "Произошла ошибка: '" + std::string(what) + "'";
-            res.prepare_payload();
-            return res;
+        http::response<http::string_body> res{ http::status::internal_server_error, req.version() };
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(false);
+        res.body() = "Произошла ошибка: '" + std::string(what) + "'";
+        res.prepare_payload();
+        return res;
         };
 
     if (req.method() != http::verb::get && req.method() != http::verb::post)
@@ -182,9 +260,7 @@ http::message_generator Server::handle_request(http::request<http::string_body>&
         std::vector<std::string> results;
         if (!reqWords.empty())
         {
-            std::unique_lock<std::mutex> ul(*m_ptr);
             results = database->getResults(reqWords);
-            ul.unlock();
         }
         writeHtmlAnswer(htmlText, results);
     }
@@ -197,7 +273,36 @@ http::message_generator Server::handle_request(http::request<http::string_body>&
     return res;
 }
 
-beast::string_view Server::mime_type(beast::string_view path)
+std::vector<std::string> session::requestParser(std::string request)
+{
+    boost::algorithm::to_lower(request);
+    int begin = request.find("query=");
+    int end = 0;
+    std::vector<std::string> v;
+    if (begin != NOTFOUND)
+    {
+        begin += 6;
+        while (end != NOTFOUND)
+        {
+            end = request.find("+", begin);
+            if (end != NOTFOUND)
+            {
+                v.push_back(request.substr(begin, end - begin));
+                begin = end + 1;
+            }
+            else
+            {
+                if (begin != NOTFOUND)
+                {
+                    v.push_back(request.substr(begin, request.size() - begin));
+                }
+            }
+        }
+    }
+    return v; //NRVO
+}
+
+beast::string_view session::mime_type(beast::string_view path)
 {
     using beast::iequals;
     auto const ext = [&path]
@@ -231,27 +336,7 @@ beast::string_view Server::mime_type(beast::string_view path)
     return "application/text";
 }
 
-void Server::readHtml(std::string& text)
-{
-    std::ifstream file;
-    file.open("../../../html/index.html");
-    if (file.is_open())
-    {
-        std::string buf;
-        while (!file.eof())
-        {
-            std::getline(file, buf);
-            text += buf + '\n';
-        }
-        file.close();
-    }
-    else
-    {
-        throw std::exception("Не удалось открыть HTML файл");
-    }
-}
-
-void Server::clearHtml(std::string& text)
+void session::clearHtml(std::string& text)
 {
     int begin = text.find("<ol>");
     begin += 4;
@@ -263,7 +348,7 @@ void Server::clearHtml(std::string& text)
     text.erase(begin, end - begin);
 }
 
-void Server::writeHtmlAnswer(std::string& text, const std::vector<std::string>& results)
+void session::writeHtmlAnswer(std::string& text, const std::vector<std::string>& results)
 {
     clearHtml(text);
     if (!results.empty())
@@ -283,4 +368,9 @@ void Server::writeHtmlAnswer(std::string& text, const std::vector<std::string>& 
         begin += 3;
         text.insert(begin, "По данному запросу ничего не найено");
     }
+}
+
+void session::fail(beast::error_code ec, char const* what)
+{
+    log->add(what + ec.message());
 }

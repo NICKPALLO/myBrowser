@@ -42,6 +42,7 @@ public:
 	ThreadPool(Crowler* _crowler);
 	void startWork();
 	void push(const URLParser& url, int recursionStep);
+	void set_workDone(const bool val);
 private:
 	void work();
 	int threadsNum = 0;

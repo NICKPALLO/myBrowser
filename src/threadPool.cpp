@@ -60,6 +60,12 @@ void SafeQueue::set_workDone(const bool val)
 	cv.notify_all();
 }
 
+void ThreadPool::set_workDone(const bool val)
+{
+	sq.set_workDone(val);
+}
+
+
 void SafeQueue::set_threadsNum(int _threadsNum)
 {
 	threadsNum = _threadsNum;

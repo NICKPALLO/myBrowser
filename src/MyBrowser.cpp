@@ -21,8 +21,8 @@ MyBrowser::MyBrowser()
 
         database = std::make_shared<DB>(DB_host, DB_port, DB_name, DB_user, DB_password);
         log = std::make_shared<Logger>();
-        crowler = std::make_unique<Crowler>(database, log, recursionLength, startlink);
-        server = std::make_unique<Server>(database, log, server_ip, server_port);
+        crowler = std::make_shared<Crowler>(database, log, recursionLength, startlink);
+        server = std::make_shared<Server>(database, log, server_ip, server_port,5);
     }
     catch (std::exception ex)
     {
@@ -33,6 +33,18 @@ MyBrowser::MyBrowser()
 void MyBrowser::start()
 {
     std::cout << "Сервер и поисковик запущены...\n";
-    std::thread{ &Crowler::startWork, crowler.get()}.detach();
-    std::thread{ &Server::accepting, server.get() }.join();
+    std::thread th_crowler (& Crowler::startWork, crowler.get());
+    std::thread th_server (& Server::startwork, server.get());
+
+    std::string responce;
+    std::cout << "Для выхода введите exit: ";
+    while (responce != "exit")
+    {
+        std::cin >> responce;
+    }
+
+    crowler->exit();
+    server->close_server();
+    th_crowler.join();
+    th_server.join();
 }

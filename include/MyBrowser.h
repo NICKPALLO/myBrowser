@@ -16,8 +16,8 @@ private:
 	std::shared_ptr<DB> database;
 	std::shared_ptr<Logger> log;
 
-	std::unique_ptr<Crowler> crowler;
-	std::unique_ptr<Server> server;
+	std::shared_ptr<Crowler> crowler;
+	std::shared_ptr<Server> server;
 
 	std::unique_ptr<ini_parser> iniParser;
 

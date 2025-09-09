@@ -318,3 +318,8 @@ std::unordered_map<std::string,int> Crowler::writeWords(std::string& data)
 	//return std::move(words);
 	return words; //NRVO
 }
+
+void Crowler::exit()
+{
+	threadPool->set_workDone(true);
+}
