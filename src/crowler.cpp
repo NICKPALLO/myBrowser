@@ -270,7 +270,7 @@ std::string& Crowler::clearText(std::string& data)
 			{
 				++j;
 				++length;
-			} while (data[j] != '>');
+			} while (data[j] != '>' && j != data.size()-1);
 			data.erase(i, length);
 			--i;
 		}

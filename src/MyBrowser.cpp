@@ -5,7 +5,7 @@ MyBrowser::MyBrowser()
 {
     try
     {
-        iniParser = std::make_unique<ini_parser>("../../../test.ini");
+        iniParser = std::make_unique<ini_parser>("../../../inf.ini");
 
         DB_host = iniParser->get_value<std::string>("DB_Section", "host");
         DB_port = iniParser->get_value<std::string>("DB_Section", "port");
