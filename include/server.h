@@ -29,8 +29,8 @@ private:
 
 	std::string startHtml;
 
-	std::atomic_bool exit = false;
     int threadsNum;
+    std::vector<std::thread> threads;
 };
 
 
@@ -63,4 +63,5 @@ public:
     std::string startHtml;
     std::shared_ptr<DB> database;
     std::shared_ptr<Logger> log;
+
 };

@@ -71,13 +71,13 @@ void SafeQueue::set_threadsNum(int _threadsNum)
 	threadsNum = _threadsNum;
 }
 
-ThreadPool::ThreadPool(Crowler* _crowler) : crowler(_crowler) {}
+ThreadPool::ThreadPool(Crowler* _crowler, int threadsNum_) : crowler(_crowler) 
+{
+	threadsNum = threadsNum_;
+}
 
 void ThreadPool::startWork()
 {
-	threadsNum = std::thread::hardware_concurrency() - 2;
-	threadsNum = threadsNum <= 0 ? 1 : threadsNum;
-	
 	sq.set_workDone(false);
 	sq.set_threadsNum(threadsNum);
 

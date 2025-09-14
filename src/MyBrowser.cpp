@@ -21,8 +21,12 @@ MyBrowser::MyBrowser()
 
         database = std::make_shared<DB>(DB_host, DB_port, DB_name, DB_user, DB_password);
         log = std::make_shared<Logger>();
-        crowler = std::make_shared<Crowler>(database, log, recursionLength, startlink);
-        server = std::make_shared<Server>(database, log, server_ip, server_port,5);
+        int threadsNum = std::thread::hardware_concurrency() - 1;
+        threadsNum = threadsNum < 2 ? 2 : threadsNum;
+        int crowlerThreadsNum = threadsNum / 2;
+        int serverThreadsNum = threadsNum - crowlerThreadsNum;
+        crowler = std::make_shared<Crowler>(database, log, recursionLength, startlink, crowlerThreadsNum);
+        server = std::make_shared<Server>(database, log, server_ip, server_port, serverThreadsNum);
     }
     catch (std::exception ex)
     {

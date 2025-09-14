@@ -23,7 +23,7 @@
 class Crowler
 {
 public:
-	Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_);
+	Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_, int threadsNum_);
 	void startWork();
 	void searching(const URLParser& url, const int recursionStep);
 	void exit();
@@ -46,5 +46,6 @@ private:
 
 	int recursionLength;
 	std::string startlink;
+	int threadsNum;
 };
 

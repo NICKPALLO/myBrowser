@@ -39,7 +39,7 @@ private:
 class ThreadPool
 {
 public:
-	ThreadPool(Crowler* _crowler);
+	ThreadPool(Crowler* _crowler, int threadsNum_);
 	void startWork();
 	void push(const URLParser& url, int recursionStep);
 	void set_workDone(const bool val);

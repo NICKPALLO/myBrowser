@@ -2,10 +2,10 @@
 #include <algorithm>
 
 
-Crowler::Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_) : ctx(ssl::context::tls_client)
+Crowler::Crowler(std::shared_ptr<DB> database_, std::shared_ptr<Logger> log_, int recursionLength_, std::string startlink_, int threadsNum_) : ctx(ssl::context::tls_client)
 {
-	//m_ptr = std::make_unique<std::mutex>();
-	threadPool = std::make_unique<ThreadPool>(this);
+	threadsNum = threadsNum_;
+	threadPool = std::make_unique<ThreadPool>(this, threadsNum);
 	recursionLength = recursionLength_;
 	startlink = startlink_;
 	log = log_;

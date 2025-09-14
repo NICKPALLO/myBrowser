@@ -29,10 +29,9 @@ void Server::startwork()
     try
     {
         async_accepting();
-        std::vector<std::thread> v;
-        v.reserve(threadsNum - 1);
+        threads.reserve(threadsNum - 1);
         for (auto i = threadsNum - 1; i > 0; --i)
-            v.emplace_back([this] {ioc.run(); });
+            threads.emplace_back([this] {ioc.run(); });
         ioc.run();
     }
     catch (std::exception ex)
@@ -44,7 +43,7 @@ void Server::startwork()
 
 void Server::close_server()
 {
-    exit = true;
+    //exit = true;
     beast::error_code ec;
     acceptor->close(ec);
     if (ec)
@@ -52,11 +51,17 @@ void Server::close_server()
         if (ec == net::error::operation_aborted) {
             // это нормальное завершение работы acceptor
             std::cout << "Acceptor stopped\n";
-            return;
         }
-        fail(ec, "accept");
+        else
+        {
+            fail(ec, "accept");
+        }
     }
-    //ioc.stop();
+    ioc.stop();
+    for (int i =0;i< threads.size();++i)
+    {
+        threads[i].join();
+    }
 }
 
 void Server::async_accepting()

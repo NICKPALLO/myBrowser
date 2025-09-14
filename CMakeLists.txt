@@ -7,6 +7,7 @@ set(OPENSSL_ROOT_DIR "C:/vcpkg/vcpkg/installed/x64-windows") #Путь к OpenSS
 
 set(PostgreSQL_ADDITIONAL_VERSIONS "17")
 set(PostgreSQL_ROOT "C:/Program Files/PostgreSQL/17")
+set(libpqxx_DIR "D:\\libraries\\libpqxx-7.10.0")
 
 #необходим 20 стандарт
 set(CMAKE_CXX_STANDARD 20)
@@ -34,7 +35,7 @@ set(PROJECT_SOURCES
 
 add_executable(MyBrowser ${PROJECT_SOURCES})
 
-add_subdirectory("D:\\libraries\\libpqxx-7.10.0" libpqxx-build)   
+add_subdirectory(${libpqxx_DIR} libpqxx-build)   
 
 target_include_directories(MyBrowser PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include)
 
