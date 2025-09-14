@@ -8,7 +8,7 @@
 - Open SSL
 - PostgreSQL 17
 - libpqxx
-- Парсер ini файлов
+- [Парсер ini файлов](https://github.com/NICKPALLO/ini-Parser)
 ***
 В данной программе реализованы следующие классы:
 - `Crowler` - обходит сайты, парсит содержимое и записывает результаты в PostgreSQL
